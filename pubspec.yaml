@@ -1,5 +1,5 @@
 name: pdfviewver
-description: "A new Flutter project."
+description: "Professional PDF Viewer app with beautiful UI, bookmarks, recent files, and smooth navigation. View, read, and manage your PDF documents with ease."
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.0.0+1
 
@@ -17,6 +17,9 @@ dependencies:
   provider: ^6.0.5
   path_provider: ^2.1.1
   path: ^1.8.3
+  url_launcher: ^6.2.2
+  share_plus: ^7.2.1
+  webview_flutter: ^4.4.2
 
 dev_dependencies:
   flutter_test:

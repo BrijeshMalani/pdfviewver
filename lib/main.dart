@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'bookmark_service.dart';
 import 'recent_files_service.dart';
+import 'theme_service.dart';
 import 'home_screen.dart';
 import 'pdf_viewer_page.dart';
+import 'splash_screen.dart';
+import 'onboarding_screen.dart';
+import 'exit_dialog.dart';
 import 'dart:io';
 
 void main() async {
@@ -20,11 +25,13 @@ void main() async {
 
   final bookmarkService = await BookmarkService.init();
   final recentFilesService = await RecentFilesService.init();
+  final themeService = ThemeService();
 
   runApp(
     MyApp(
       bookmarkService: bookmarkService,
       recentFilesService: recentFilesService,
+      themeService: themeService,
     ),
   );
 }
@@ -32,11 +39,13 @@ void main() async {
 class MyApp extends StatelessWidget {
   final BookmarkService bookmarkService;
   final RecentFilesService recentFilesService;
+  final ThemeService themeService;
 
   const MyApp({
     Key? key,
     required this.bookmarkService,
     required this.recentFilesService,
+    required this.themeService,
   }) : super(key: key);
 
   @override
@@ -47,60 +56,138 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider<RecentFilesService>.value(
           value: recentFilesService,
         ),
+        ChangeNotifierProvider<ThemeService>.value(value: themeService),
       ],
-      child: MaterialApp(
-        debugShowCheckedModeBanner: false,
-        title: 'Professional PDF Viewer',
-        theme: ThemeData(
-          primarySwatch: Colors.blue,
-          primaryColor: Colors.blue.shade700,
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.blue,
-            brightness: Brightness.light,
-          ),
-          useMaterial3: true,
-          appBarTheme: AppBarTheme(
-            elevation: 0,
-            centerTitle: true,
-            backgroundColor: Colors.blue.shade700,
-            foregroundColor: Colors.white,
-          ),
-          cardTheme: CardThemeData(
-            elevation: 2,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+      child: Consumer<ThemeService>(
+        builder: (context, themeService, child) {
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            title: 'PDF Viewer',
+            theme: ThemeData(
+              primarySwatch: Colors.blue,
+              primaryColor: const Color(0xFF667EEA),
+              colorScheme: ColorScheme.fromSeed(
+                seedColor: const Color(0xFF667EEA),
+                brightness: Brightness.light,
+                primary: const Color(0xFF667EEA),
+                secondary: const Color(0xFF764BA2),
+              ),
+              useMaterial3: true,
+              appBarTheme: AppBarTheme(
+                elevation: 0,
+                centerTitle: true,
+                backgroundColor: Colors.transparent,
+                foregroundColor: Colors.black87,
+                iconTheme: const IconThemeData(color: Colors.black87),
+              ),
+              cardTheme: CardThemeData(
+                elevation: 3,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                shadowColor: Colors.black.withOpacity(0.1),
+              ),
+              floatingActionButtonTheme: FloatingActionButtonThemeData(
+                backgroundColor: const Color(0xFF667EEA),
+                foregroundColor: Colors.white,
+                elevation: 4,
+              ),
+              inputDecorationTheme: InputDecorationTheme(
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: true,
+                fillColor: Colors.grey.shade50,
+              ),
             ),
-          ),
-          floatingActionButtonTheme: FloatingActionButtonThemeData(
-            backgroundColor: Colors.blue.shade700,
-            foregroundColor: Colors.white,
-          ),
-        ),
-        darkTheme: ThemeData(
-          primarySwatch: Colors.blue,
-          primaryColor: Colors.blue.shade300,
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.blue,
-            brightness: Brightness.dark,
-          ),
-          useMaterial3: true,
-          appBarTheme: AppBarTheme(
-            elevation: 0,
-            centerTitle: true,
-            backgroundColor: Colors.blue.shade900,
-            foregroundColor: Colors.white,
-          ),
-          cardTheme: CardThemeData(
-            elevation: 2,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+            darkTheme: ThemeData(
+              primarySwatch: Colors.blue,
+              primaryColor: const Color(0xFF667EEA),
+              colorScheme: ColorScheme.fromSeed(
+                seedColor: const Color(0xFF667EEA),
+                brightness: Brightness.dark,
+                primary: const Color(0xFF667EEA),
+                secondary: const Color(0xFF764BA2),
+              ),
+              useMaterial3: true,
+              appBarTheme: AppBarTheme(
+                elevation: 0,
+                centerTitle: true,
+                backgroundColor: Colors.transparent,
+                foregroundColor: Colors.white,
+                iconTheme: const IconThemeData(color: Colors.white),
+              ),
+              cardTheme: CardThemeData(
+                elevation: 3,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                shadowColor: Colors.black.withOpacity(0.3),
+              ),
+              floatingActionButtonTheme: FloatingActionButtonThemeData(
+                backgroundColor: const Color(0xFF667EEA),
+                foregroundColor: Colors.white,
+                elevation: 4,
+              ),
             ),
-          ),
-        ),
-        themeMode: ThemeMode.system,
-        home: const HomeScreenWrapper(),
+            themeMode: themeService.themeMode,
+            routes: {'/home': (context) => const HomeScreenWrapper()},
+            home: const AppInitializer(),
+          );
+        },
       ),
     );
+  }
+}
+
+class AppInitializer extends StatefulWidget {
+  const AppInitializer({Key? key}) : super(key: key);
+
+  @override
+  _AppInitializerState createState() => _AppInitializerState();
+}
+
+class _AppInitializerState extends State<AppInitializer> {
+  bool _showSplash = true;
+  bool _isOnboardingCompleted = false;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkOnboardingStatus();
+  }
+
+  Future<void> _checkOnboardingStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final completed = prefs.getBool('onboarding_completed') ?? false;
+    setState(() {
+      _isOnboardingCompleted = completed;
+      _isLoading = false;
+    });
+  }
+
+  void _onSplashComplete() {
+    setState(() {
+      _showSplash = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (_showSplash) {
+      return SplashScreen(onAnimationComplete: _onSplashComplete);
+    }
+
+    if (!_isOnboardingCompleted) {
+      return const OnboardingScreen();
+    }
+
+    return const HomeScreenWrapper();
   }
 }
 
@@ -214,6 +301,12 @@ class _HomeScreenWrapperState extends State<HomeScreenWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    return const HomeScreen();
+    return WillPopScope(
+      onWillPop: () async {
+        final shouldExit = await ExitDialog.show(context);
+        return shouldExit ?? false;
+      },
+      child: const HomeScreen(),
+    );
   }
 }
