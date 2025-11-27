@@ -10,6 +10,13 @@ import 'pdf_viewer_page.dart';
 import 'splash_screen.dart';
 import 'onboarding_screen.dart';
 import 'exit_dialog.dart';
+import 'utils/file_type_utils.dart';
+import 'viewers/image_viewer.dart';
+import 'viewers/text_viewer.dart';
+import 'viewers/html_viewer.dart';
+import 'viewers/media_player.dart';
+import 'viewers/archive_viewer.dart';
+import 'package:open_filex/open_filex.dart';
 import 'dart:io';
 
 void main() async {
@@ -241,18 +248,37 @@ class _HomeScreenWrapperState extends State<HomeScreenWrapper> {
     try {
       // Handle content:// URIs first
       if (uri.startsWith('content://')) {
-        final fileName = 'PDF Document';
+        // For content URIs, try to detect file type from URI or use PDF as default
+        final fileName = 'Document';
+        final fileCategory = FileTypeUtils.getFileCategory(uri);
+
         if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => PdfViewerPage(
-                id: uri,
-                isFile: false, // Content URIs are treated as network-like
-                title: fileName,
+          if (fileCategory == FileTypeCategory.pdf) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => PdfViewerPage(
+                  id: uri,
+                  isFile: false, // Content URIs are treated as network-like
+                  title: fileName,
+                ),
               ),
-            ),
-          );
+            );
+          } else {
+            // For other file types with content URI, try to open with external app
+            try {
+              await OpenFilex.open(uri);
+            } catch (e) {
+              // Fallback to PDF viewer if open fails
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      PdfViewerPage(id: uri, isFile: false, title: fileName),
+                ),
+              );
+            }
+          }
         }
         return;
       }
@@ -269,6 +295,7 @@ class _HomeScreenWrapperState extends State<HomeScreenWrapper> {
       final file = File(filePath);
       if (file.existsSync()) {
         final fileName = filePath.split('/').last.split('\\').last;
+        final fileCategory = FileTypeUtils.getFileCategory(filePath);
 
         // Add to recent files
         final recentFilesService = Provider.of<RecentFilesService>(
@@ -278,13 +305,91 @@ class _HomeScreenWrapperState extends State<HomeScreenWrapper> {
         await recentFilesService.addFile(filePath);
 
         if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) =>
-                  PdfViewerPage(id: filePath, isFile: true, title: fileName),
-            ),
-          );
+          // Open file based on type
+          switch (fileCategory) {
+            case FileTypeCategory.pdf:
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => PdfViewerPage(
+                    id: filePath,
+                    isFile: true,
+                    title: fileName,
+                  ),
+                ),
+              );
+              break;
+
+            case FileTypeCategory.image:
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      ImageViewer(filePath: filePath, title: fileName),
+                ),
+              );
+              break;
+
+            case FileTypeCategory.text:
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      TextViewer(filePath: filePath, title: fileName),
+                ),
+              );
+              break;
+
+            case FileTypeCategory.html:
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      HtmlViewer(filePath: filePath, title: fileName),
+                ),
+              );
+              break;
+
+            case FileTypeCategory.audio:
+            case FileTypeCategory.video:
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => MediaPlayer(
+                    filePath: filePath,
+                    title: fileName,
+                    fileType: fileCategory,
+                  ),
+                ),
+              );
+              break;
+
+            case FileTypeCategory.archive:
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      ArchiveViewer(filePath: filePath, title: fileName),
+                ),
+              );
+              break;
+
+            default:
+              // Try to open with external app
+              try {
+                await OpenFilex.open(filePath);
+              } catch (e) {
+                // If external app fails, show error
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Could not open file: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+          }
         }
       }
     } catch (e) {

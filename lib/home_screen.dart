@@ -6,6 +6,13 @@ import 'bookmark_service.dart';
 import 'recent_files_service.dart';
 import 'pdf_viewer_page.dart';
 import 'profile_screen.dart';
+import 'utils/file_type_utils.dart';
+import 'viewers/image_viewer.dart';
+import 'viewers/text_viewer.dart';
+import 'viewers/html_viewer.dart';
+import 'viewers/media_player.dart';
+import 'viewers/archive_viewer.dart';
+import 'package:open_filex/open_filex.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -231,7 +238,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Material(
                       color: Colors.transparent,
                       child: InkWell(
-                        onTap: () => _openLocalPdf(context, recentFilesService),
+                        onTap: () => _openAnyFile(context, recentFilesService),
                         borderRadius: BorderRadius.circular(20),
                         child: Container(
                           padding: const EdgeInsets.all(20),
@@ -255,7 +262,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      'Open PDF File',
+                                      'Open Any File',
                                       style: Theme.of(context)
                                           .textTheme
                                           .titleLarge
@@ -267,7 +274,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ),
                                     const SizedBox(height: 6),
                                     Text(
-                                      'Browse and open PDF from your device',
+                                      'PDF, Word, Excel, PPT, Images, Text & More',
                                       style: Theme.of(context)
                                           .textTheme
                                           .bodyMedium
@@ -620,16 +627,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: InkWell(
                       onTap: fileExists
                           ? () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => PdfViewerPage(
-                                    id: file.path,
-                                    isFile: true,
-                                    title: file.name,
-                                  ),
-                                ),
-                              );
+                              _openFileByType(context, file.path, file.name);
                             }
                           : null,
                       borderRadius: BorderRadius.circular(18),
@@ -637,31 +635,38 @@ class _HomeScreenState extends State<HomeScreen> {
                         padding: const EdgeInsets.all(16),
                         child: Row(
                           children: [
-                            Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [
-                                    Color(0xFF4FACFE),
-                                    Color(0xFF00F2FE),
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(14),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(
-                                      0xFF4FACFE,
-                                    ).withOpacity(0.3),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 4),
+                            Builder(
+                              builder: (context) {
+                                final fileCategory =
+                                    FileTypeUtils.getFileCategory(file.path);
+                                final gradient =
+                                    FileTypeUtils.getFileTypeGradient(
+                                      fileCategory,
+                                    );
+                                final icon = FileTypeUtils.getFileTypeIcon(
+                                  fileCategory,
+                                );
+
+                                return Container(
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(colors: gradient),
+                                    borderRadius: BorderRadius.circular(14),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: gradient[0].withOpacity(0.3),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
-                              child: const Icon(
-                                Icons.picture_as_pdf_rounded,
-                                color: Colors.white,
-                                size: 32,
-                              ),
+                                  child: Icon(
+                                    icon,
+                                    color: Colors.white,
+                                    size: 32,
+                                  ),
+                                );
+                              },
                             ),
                             const SizedBox(width: 16),
                             Expanded(
@@ -813,47 +818,59 @@ class _HomeScreenState extends State<HomeScreen> {
                     color: Colors.transparent,
                     child: InkWell(
                       onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => PdfViewerPage(
-                              id: id,
-                              isFile: isFile,
-                              title: fileName,
+                        if (isFile) {
+                          _openFileByType(context, id, fileName);
+                        } else {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => PdfViewerPage(
+                                id: id,
+                                isFile: isFile,
+                                title: fileName,
+                              ),
                             ),
-                          ),
-                        );
+                          );
+                        }
                       },
                       borderRadius: BorderRadius.circular(18),
                       child: Padding(
                         padding: const EdgeInsets.all(16),
                         child: Row(
                           children: [
-                            Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [
-                                    Color(0xFF43E97B),
-                                    Color(0xFF38F9D7),
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(14),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(
-                                      0xFF43E97B,
-                                    ).withOpacity(0.3),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 4),
+                            Builder(
+                              builder: (context) {
+                                final fileCategory = isFile
+                                    ? FileTypeUtils.getFileCategory(id)
+                                    : FileTypeCategory.pdf;
+                                final gradient =
+                                    FileTypeUtils.getFileTypeGradient(
+                                      fileCategory,
+                                    );
+                                final icon = FileTypeUtils.getFileTypeIcon(
+                                  fileCategory,
+                                );
+
+                                return Container(
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(colors: gradient),
+                                    borderRadius: BorderRadius.circular(14),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: gradient[0].withOpacity(0.3),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
-                              child: const Icon(
-                                Icons.picture_as_pdf_rounded,
-                                color: Colors.white,
-                                size: 32,
-                              ),
+                                  child: Icon(
+                                    icon,
+                                    color: Colors.white,
+                                    size: 32,
+                                  ),
+                                );
+                              },
                             ),
                             const SizedBox(width: 16),
                             Expanded(
@@ -908,14 +925,13 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _openLocalPdf(
+  Future<void> _openAnyFile(
     BuildContext context,
     RecentFilesService recentFilesService,
   ) async {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['pdf'],
+        type: FileType.any,
         withData: false,
       );
 
@@ -927,13 +943,7 @@ class _HomeScreenState extends State<HomeScreen> {
         await recentFilesService.addFile(path);
 
         if (context.mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) =>
-                  PdfViewerPage(id: path, isFile: true, title: fileName),
-            ),
-          );
+          await _openFileByType(context, path, fileName);
         }
       }
     } catch (e) {
@@ -942,9 +952,173 @@ class _HomeScreenState extends State<HomeScreen> {
           SnackBar(
             content: Text('Error opening file: $e'),
             backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
           ),
         );
       }
+    }
+  }
+
+  Future<void> _openFileByType(
+    BuildContext context,
+    String filePath,
+    String fileName,
+  ) async {
+    final fileCategory = FileTypeUtils.getFileCategory(filePath);
+
+    switch (fileCategory) {
+      case FileTypeCategory.pdf:
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) =>
+                PdfViewerPage(id: filePath, isFile: true, title: fileName),
+          ),
+        );
+        break;
+
+      case FileTypeCategory.image:
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ImageViewer(filePath: filePath, title: fileName),
+          ),
+        );
+        break;
+
+      case FileTypeCategory.text:
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => TextViewer(filePath: filePath, title: fileName),
+          ),
+        );
+        break;
+
+      case FileTypeCategory.html:
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => HtmlViewer(filePath: filePath, title: fileName),
+          ),
+        );
+        break;
+
+      case FileTypeCategory.audio:
+      case FileTypeCategory.video:
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => MediaPlayer(
+              filePath: filePath,
+              title: fileName,
+              fileType: fileCategory,
+            ),
+          ),
+        );
+        break;
+
+      case FileTypeCategory.archive:
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ArchiveViewer(filePath: filePath, title: fileName),
+          ),
+        );
+        break;
+
+      case FileTypeCategory.word:
+      case FileTypeCategory.excel:
+      case FileTypeCategory.powerpoint:
+        // Show conversion dialog or open with external app
+        final shouldConvert = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: FileTypeUtils.getFileTypeGradient(fileCategory),
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    FileTypeUtils.getFileTypeIcon(fileCategory),
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text('Open File'),
+              ],
+            ),
+            content: Text(
+              '${FileTypeUtils.getFileTypeName(fileCategory)} files can be opened with external apps. '
+              'Would you like to open this file?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF667EEA),
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Open'),
+              ),
+            ],
+          ),
+        );
+
+        if (shouldConvert == true) {
+          try {
+            await OpenFilex.open(filePath);
+          } catch (e) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Error opening file: $e'),
+                  backgroundColor: Colors.red,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              );
+            }
+          }
+        }
+        break;
+
+      default:
+        // Try to open with external app
+        try {
+          await OpenFilex.open(filePath);
+        } catch (e) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Unsupported file type. Error: $e'),
+                backgroundColor: Colors.orange,
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            );
+          }
+        }
     }
   }
 
